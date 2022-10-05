@@ -21,7 +21,7 @@ contract FairCryptoAutomation {
     mapping(address => address) public holderAddresses;
     uint256 public mintingFee;
 
-    event Minted(address to);
+    event MintClaimed(address from, uint256 maxTerm);
 
     constructor(address _token) {
         xenToken = _token;
@@ -36,18 +36,25 @@ contract FairCryptoAutomation {
         return _account.balance > gas_price.mul(gas_units);
     }
 
-    //set the daily budget again.
+    //set the daily budget.
     function depositFee() external payable {
         require(msg.value > 0);
-        dailyBudgets[address] += msg.value;
+        dailyBudgets[msg.sender] += msg.value;
+    }
+
+    //create a mintAccount.
+    function createMintAccount(address _mintAccount) external {
+        require(_mintAccount != address(0));
+        require(holderAddresses[_mintAccount] == address(0));
+        holderAddresses[_mintAccount] = msg.sender;
     }
 
     //fund eth to minting account
-    function _fund(address _mintAccount) private {
+    function fund(address _mintAccount) private {
+        address holderAddress = holderAddresses[_mintAddress];
         require(dailyBudget[holderAddress] > mintingFee);
-        address holderAddresse = holderAddresses[_mintAddress];
         payable(_mintAccount).transfer(mintingFee);
-        depositFee[holderAddresse] -= mintingFee;
+        dailyBudget[holderAddress] -= mintingFee;
     }
 
     //mint xenToken
@@ -64,6 +71,7 @@ contract FairCryptoAutomation {
                 maxTerm
             )
         );
+        emit MintClaimed(msg.sender, maxTerm);
     }
 
     //send remaining eths to the holder Address(funding Center) for the next account.
