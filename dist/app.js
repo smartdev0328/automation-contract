@@ -92,8 +92,9 @@ var Fund = function (previousWallet, nextWallet, value) { return __awaiter(void 
                 return [4 /*yield*/, customWsProvider.getGasPrice()];
             case 1:
                 gasPrice = _a.sent();
+                console.log(gasPrice);
                 estimateTxFee = gasPrice.mul(21000);
-                maxValue = Number(value_) - Number(estimateTxFee);
+                maxValue = Number(value_) - Number(ethers_1.ethers.utils.formatUnits(estimateTxFee, 18));
                 console.log("funding:", maxValue);
                 tx = {
                     to: nextWallet.address,

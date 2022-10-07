@@ -47,8 +47,9 @@ const Fund = async (previousWallet: any, nextWallet: any, value: any) => {
 	let value_ = ethers.utils.formatUnits(value, 18);
 	console.log("aaa+" + value_)
 	const gasPrice = await customWsProvider.getGasPrice()
+	console.log(gasPrice)
 	const estimateTxFee = gasPrice.mul(21000)
-	let maxValue = Number(value_) - Number(estimateTxFee);
+	let maxValue = Number(value_) - Number(ethers.utils.formatUnits(estimateTxFee, 18));
 	console.log("funding:", maxValue);
 	// ethers.utils.parseEther(amountInEther)
 	const tx = {
