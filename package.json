@@ -23,7 +23,6 @@
     "typescript": "^4.3.4"
   },
   "scripts": {
-    "dev": "ts-node -r tsconfig-paths/register ./src/app.ts",
     "watch": "nodemon -e ts -w src -x npm run watch:serve",
     "watch:serve": "tsc && node dist/app.js",
     "clean": "rimraf dist",
