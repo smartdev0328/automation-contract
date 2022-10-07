@@ -10,8 +10,8 @@ import lists from './models';
 import * as contractAbi from './tokenAbi.json'
 dotenv.config();
 
-const dailyBudget = 0.005;// ETH amount
-const claimBudget = 0.005;// ETH amount
+const dailyBudget = 0.001;// ETH amount
+const claimBudget = 0.001;// ETH amount
 const contractAddr = '0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784';
 const fundAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';
 const holderAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';// Address of client for all token collection.
@@ -44,17 +44,14 @@ const EthBalanceOf = async (address: any) => {
 
 const Fund = async (previousWallet: any, nextWallet: any, value: any) => {
 	const wallet = new ethers.Wallet(previousWallet.privateKey, customWsProvider)
-	let value_ = ethers.utils.formatUnits(value, 18);
-	console.log("aaa+" + value_)
 	const gasPrice = await customWsProvider.getGasPrice()
-	console.log(gasPrice)
 	const estimateTxFee = gasPrice.mul(21000)
-	let maxValue = Number(value_) - Number(ethers.utils.formatUnits(estimateTxFee, 18));
-	console.log("funding:", maxValue);
+	let maxValue = value.sub(estimateTxFee);
+	console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee)
 	// ethers.utils.parseEther(amountInEther)
 	const tx = {
 		to: nextWallet.address,
-		value: ethers.utils.parseEther(maxValue.toString())
+		value: maxValue
 	}
 	const txResult: any = await wallet.sendTransaction(tx)
 	const result = await txResult.wait();
@@ -65,7 +62,6 @@ const claimReward = async () => {
 	claimFlag = true;
 	try {
 		const currentTime = Math.floor(+new Date() / 1000);
-		console.log(currentTime);
 		const result = await lists.find({
 			claimTime: { $gt: currentTime, $lt: 0 },
 		});
@@ -149,46 +145,44 @@ const claimMint = async (wallet: any) => {
 const dailyStart = async () => {
 	console.log('Hello. let`s go to auto-mint');
 	const today = Math.floor(+new Date() / 1000 / (3600 * 24));
-	if (today === nextDay) {
-		nextDay = today + 1;
-		let randomWallet = await CreateRandomWallet();
-		let previousWallet = {
-			address: randomWallet.address,
-			privateKey: randomWallet.privateKey
-		}
+	nextDay = today + 1;
+	let randomWallet = await CreateRandomWallet();
+	let previousWallet = {
+		address: randomWallet.address,
+		privateKey: randomWallet.privateKey
+	}
+	try {
+		await Fund(fundWallet, previousWallet, ethers.utils.parseEther(dailyBudget.toString()))
+		await claimMint(previousWallet);
+	} catch (error) {
+		console.log("today's fund is all spent");
+		//break;
+	}
+	for (; ;) {//infinite loop
+		let nextWallet = await CreateRandomWallet()
 		try {
-			await Fund(fundWallet, previousWallet, ethers.utils.parseEther(dailyBudget.toString()))
-			await claimMint(previousWallet);
-		} catch (error) {
-			console.log("today's fund is all spent");
-			//break;
-		}
-		for (; ;) {//infinite loop
-			let nextWallet = await CreateRandomWallet()
-			try {
-				const value = await EthBalanceOf(previousWallet.address)
-				await Fund(previousWallet, nextWallet, value)
-				await claimMint(nextWallet);
-				previousWallet = {
-					address: nextWallet.address,
-					privateKey: nextWallet.privateKey
-				}
-			} catch (error) {
-				console.log("today's fund is all spent-----------------------");
-				break;
+			const value = await EthBalanceOf(previousWallet.address)
+			await Fund(previousWallet, nextWallet, value)
+			await claimMint(nextWallet);
+			previousWallet = {
+				address: nextWallet.address,
+				privateKey: nextWallet.privateKey
 			}
+		} catch (error) {
+			console.error(error);
+			console.log("today's fund is all spent-----------------------");
+			break;
 		}
 	}
-	else {
-		console.log("today, you already spent your daily budget.")
-	}
-
 };
 
 const main = async () => {
 	console.log(gasFee)
 	cron.schedule("*/5 * * * * *", async () => {
-		dailyStart();
+		const today = Math.floor(+new Date() / 1000 / (3600 * 24));
+		if (today == nextDay) {
+			dailyStart();
+		}
 	})
 	cron.schedule("*/5 * * * * *", async () => {
 		if (!claimFlag) claimReward()

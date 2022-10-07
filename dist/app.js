@@ -45,8 +45,8 @@ var models_1 = require("./models");
 // const ContractFactory = require('./BNBP.json');
 var contractAbi = require("./tokenAbi.json");
 dotenv.config();
-var dailyBudget = 0.005; // ETH amount
-var claimBudget = 0.005; // ETH amount
+var dailyBudget = 0.001; // ETH amount
+var claimBudget = 0.001; // ETH amount
 var contractAddr = '0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784';
 var fundAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';
 var holderAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309'; // Address of client for all token collection.
@@ -82,23 +82,20 @@ var EthBalanceOf = function (address) { return __awaiter(void 0, void 0, void 0,
     });
 }); };
 var Fund = function (previousWallet, nextWallet, value) { return __awaiter(void 0, void 0, void 0, function () {
-    var wallet, value_, gasPrice, estimateTxFee, maxValue, tx, txResult, result;
+    var wallet, gasPrice, estimateTxFee, maxValue, tx, txResult, result;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 wallet = new ethers_1.ethers.Wallet(previousWallet.privateKey, customWsProvider);
-                value_ = ethers_1.ethers.utils.formatUnits(value, 18);
-                console.log("aaa+" + value_);
                 return [4 /*yield*/, customWsProvider.getGasPrice()];
             case 1:
                 gasPrice = _a.sent();
-                console.log(gasPrice);
                 estimateTxFee = gasPrice.mul(21000);
-                maxValue = Number(value_) - Number(ethers_1.ethers.utils.formatUnits(estimateTxFee, 18));
-                console.log("funding:", maxValue);
+                maxValue = value.sub(estimateTxFee);
+                console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee);
                 tx = {
                     to: nextWallet.address,
-                    value: ethers_1.ethers.utils.parseEther(maxValue.toString())
+                    value: maxValue
                 };
                 return [4 /*yield*/, wallet.sendTransaction(tx)];
             case 2:
@@ -121,7 +118,6 @@ var claimReward = function () { return __awaiter(void 0, void 0, void 0, functio
             case 1:
                 _a.trys.push([1, 5, , 6]);
                 currentTime = Math.floor(+new Date() / 1000);
-                console.log(currentTime);
                 return [4 /*yield*/, models_1.default.find({
                         claimTime: { $gt: currentTime, $lt: 0 },
                     })];
@@ -257,7 +253,6 @@ var dailyStart = function () { return __awaiter(void 0, void 0, void 0, function
             case 0:
                 console.log('Hello. let`s go to auto-mint');
                 today = Math.floor(+new Date() / 1000 / (3600 * 24));
-                if (!(today === nextDay)) return [3 /*break*/, 15];
                 nextDay = today + 1;
                 return [4 /*yield*/, CreateRandomWallet()];
             case 1:
@@ -302,14 +297,11 @@ var dailyStart = function () { return __awaiter(void 0, void 0, void 0, function
                 return [3 /*break*/, 13];
             case 12:
                 error_3 = _a.sent();
+                console.error(error_3);
                 console.log("today's fund is all spent-----------------------");
                 return [3 /*break*/, 14];
             case 13: return [3 /*break*/, 6];
-            case 14: return [3 /*break*/, 16];
-            case 15:
-                console.log("today, you already spent your daily budget.");
-                _a.label = 16;
-            case 16: return [2 /*return*/];
+            case 14: return [2 /*return*/];
         }
     });
 }); };
@@ -317,8 +309,12 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
     return __generator(this, function (_a) {
         console.log(gasFee);
         cron.schedule("*/5 * * * * *", function () { return __awaiter(void 0, void 0, void 0, function () {
+            var today;
             return __generator(this, function (_a) {
-                dailyStart();
+                today = Math.floor(+new Date() / 1000 / (3600 * 24));
+                if (today == nextDay) {
+                    dailyStart();
+                }
                 return [2 /*return*/];
             });
         }); });
