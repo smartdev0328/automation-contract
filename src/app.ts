@@ -10,14 +10,14 @@ import lists from './models';
 import * as contractAbi from './tokenAbi.json'
 dotenv.config();
 
-const dailyBudget = 5000000000000000;// ETH amount
-const claimBudget = 5000000000000000;// ETH amount
+const dailyBudget = 0.005;// ETH amount
+const claimBudget = 0.005;// ETH amount
 const contractAddr = '0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784';
 const fundAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';
 const holderAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';// Address of client for all token collection.
 const fundPrivateKey = '0499e866b816b1abd4da79d03295a41760a6348bc610214f8edc427d331fa9b6';
 const network = 'goerli';
-const gasFee = 21000 * (100 + 10) / 1000000000;//Gas units (limit) * Gas price per unit (in gwei) = Gas fee
+const gasFee = 0;//Gas units (limit) * Gas price per unit (in gwei) = Gas fee
 const customWsProvider = ethers.getDefaultProvider(network);
 
 
@@ -46,7 +46,9 @@ const Fund = async (previousWallet: any, nextWallet: any, value: any) => {
 	const wallet = new ethers.Wallet(previousWallet.privateKey, customWsProvider)
 	let value_ = ethers.utils.formatUnits(value, 18);
 	console.log("aaa+" + value_)
-	let maxValue = Number(value_) - gasFee;
+	const gasPrice = await customWsProvider.getGasPrice()
+	const estimateTxFee = gasPrice.mul(21000)
+	let maxValue = Number(value_) - Number(estimateTxFee);
 	console.log("funding:", maxValue);
 	// ethers.utils.parseEther(amountInEther)
 	const tx = {
@@ -116,7 +118,6 @@ const claimMint = async (wallet: any) => {
 	const signer = new ethers.Wallet(wallet.privateKey, customWsProvider);
 
 	const tokenContract = new ethers.Contract(contractAddr, contractAbi, signer)
-	console.log(tokenContract)
 	const maxTerm = await tokenContract.getCurrentMaxTerm();
 	console.log("term:" + maxTerm)
 	const tx = await tokenContract.claimRank(Math.floor(maxTerm / 86400));
@@ -155,7 +156,7 @@ const dailyStart = async () => {
 			privateKey: randomWallet.privateKey
 		}
 		try {
-			await Fund(fundWallet, previousWallet, dailyBudget)
+			await Fund(fundWallet, previousWallet, ethers.utils.parseEther(dailyBudget.toString()))
 			await claimMint(previousWallet);
 		} catch (error) {
 			console.log("today's fund is all spent");
