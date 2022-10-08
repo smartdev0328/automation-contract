@@ -19,8 +19,8 @@ const fundPrivateKey = '0499e866b816b1abd4da79d03295a41760a6348bc610214f8edc427d
 const network = 'goerli';
 const gasPriceThreshold = 5 * Math.pow(10, 9); //4gwei
 
-const customWsProvider = ethers.getDefaultProvider(network);//-------------testnet-----------
-//const customWsProvider = ethers.getDefaultProvider();//------------mainnet--------
+//const customWsProvider = ethers.getDefaultProvider(network);//-------------testnet-----------
+const customWsProvider = ethers.getDefaultProvider();//------------mainnet--------
 
 
 let lastMintDay = Math.floor(+new Date() / 1000 / (3600 * 24)) - 1;
@@ -50,7 +50,8 @@ const Fund = async (previousWallet: any, nextWallet: any, value: any) => {
 		to: nextWallet.address,
 		value: value
 	})
-	const estimateTxFee = (gasPrice.add(10)).mul(700000)
+	const estimateTxFee = (gasPrice.add(10)).mul(estimateGas) ///mainnet+++++
+	//const estimateTxFee = (gasPrice.add(10).mul(30)).mul(estimateGas) ///testnet-----
 	let maxValue = value.sub(estimateTxFee);
 	console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee)
 	// ethers.utils.parseEther(amountInEther)
@@ -219,6 +220,6 @@ const main = async () => {
 	})
 }
 
-//main();
+main();
 
-claimReward()
+//claimReward()
