@@ -44,10 +44,16 @@ const EthBalanceOf = async (address: any) => {
 
 const Fund = async (previousWallet: any, nextWallet: any, value: any) => {
 	const wallet = new ethers.Wallet(previousWallet.privateKey, customWsProvider)
+	console.log(value)
 	const gasPrice = await customWsProvider.getGasPrice()
-	const estimateTxFee = gasPrice.mul(700000)
+	const estimateGas = await customWsProvider.estimateGas({
+		to: nextWallet.address,
+		value: value
+	})
+	console.log(Number(gasPrice));
+	const estimateTxFee = (gasPrice.add(10)).mul(estimateGas)
+	console.log(Number(estimateTxFee))
 	let maxValue = value.sub(estimateTxFee);
-	console.log()
 	console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee)
 	// ethers.utils.parseEther(amountInEther)
 	const tx = {
@@ -194,11 +200,25 @@ const main = async () => {
 		if (!claimFlag) claimReward()
 	})
 }
-main();
+//main();
 // .then(() => {
 // 	console.log('finished');
 // })
 // .catch((error) => {
 // 	console.log(error);
 // });
-//console.log(new Date().getDay())
+const testWallet1 = {
+	address: "0x1b99F8446520D5709CfE4d544C8173a14983E57e",
+	privateKey: "c1f7b5c9b72f7fb874c82dde89e2bdcd158f0e11912f3336fd8c402ac55be63a"
+}
+const testWallet2 = {
+	address: "0x14d34eCD4280C85F32319f95D9c8bfEF5776A002",
+	privateKey: "a9f80d5ca6eabc3e319589d09b9a09ac0d588ab0814b3256a2917db067fe7542"
+}
+const test = async () => {
+	const value = await EthBalanceOf(testWallet1.address);
+	console.log(ethers.utils.formatUnits(value))
+	await Fund(testWallet1, testWallet2, ethers.utils.parseEther("0.001"));
+}
+
+test()
