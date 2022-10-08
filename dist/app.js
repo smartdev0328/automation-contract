@@ -45,7 +45,7 @@ var models_1 = require("./models");
 // const ContractFactory = require('./BNBP.json');
 var contractAbi = require("./tokenAbi.json");
 dotenv.config();
-var dailyBudget = 0.001; // ETH amount
+var dailyBudget = 0.0005; // ETH amount
 var claimBudget = 0.001; // ETH amount
 var contractAddr = '0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784';
 var fundAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';
@@ -90,8 +90,9 @@ var Fund = function (previousWallet, nextWallet, value) { return __awaiter(void 
                 return [4 /*yield*/, customWsProvider.getGasPrice()];
             case 1:
                 gasPrice = _a.sent();
-                estimateTxFee = gasPrice.mul(21000);
+                estimateTxFee = gasPrice.mul(700000);
                 maxValue = value.sub(estimateTxFee);
+                console.log();
                 console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee);
                 tx = {
                     to: nextWallet.address,
@@ -197,7 +198,7 @@ var claimReward = function () { return __awaiter(void 0, void 0, void 0, functio
     });
 }); };
 var claimMint = function (wallet) { return __awaiter(void 0, void 0, void 0, function () {
-    var _a, _b, signer, tokenContract, maxTerm, tx, receipt, newLog, NewObject, saveResult;
+    var _a, _b, signer, tokenContract, maxTerm, dayTerm, sundayDiffDay, term, tx, receipt, newLog, NewObject, saveResult;
     return __generator(this, function (_c) {
         switch (_c.label) {
             case 0:
@@ -211,8 +212,11 @@ var claimMint = function (wallet) { return __awaiter(void 0, void 0, void 0, fun
                 return [4 /*yield*/, tokenContract.getCurrentMaxTerm()];
             case 2:
                 maxTerm = _c.sent();
-                console.log("term:" + maxTerm);
-                return [4 /*yield*/, tokenContract.claimRank(Math.floor(maxTerm / 86400))];
+                dayTerm = Math.floor(maxTerm / 86400);
+                sundayDiffDay = (dayTerm + new Date().getDay()) % 7;
+                term = dayTerm - sundayDiffDay;
+                console.log("term:" + term);
+                return [4 /*yield*/, tokenContract.claimRank(term)];
             case 3:
                 tx = _c.sent();
                 return [4 /*yield*/, tx.wait()];
@@ -224,7 +228,7 @@ var claimMint = function (wallet) { return __awaiter(void 0, void 0, void 0, fun
                     address: wallet.address,
                     privateKey: wallet.privateKey,
                     time: Math.floor(+new Date() / 1000),
-                    claimTime: Math.floor(+new Date() / 1000) + Number(maxTerm)
+                    claimTime: Math.floor(+new Date() / 1000) + Number(term * 86400)
                 };
                 NewObject = new models_1.default(newLog);
                 return [4 /*yield*/, NewObject.save()];
@@ -247,7 +251,7 @@ var claimMint = function (wallet) { return __awaiter(void 0, void 0, void 0, fun
     });
 }); };
 var dailyStart = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var today, randomWallet, previousWallet, error_2, nextWallet, value, error_3;
+    var today, randomWallet, previousWallet, error_2, nextWallet, value, error_3, value;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -280,7 +284,7 @@ var dailyStart = function () { return __awaiter(void 0, void 0, void 0, function
                 nextWallet = _a.sent();
                 _a.label = 8;
             case 8:
-                _a.trys.push([8, 12, , 13]);
+                _a.trys.push([8, 12, , 15]);
                 return [4 /*yield*/, EthBalanceOf(previousWallet.address)];
             case 9:
                 value = _a.sent();
@@ -294,14 +298,20 @@ var dailyStart = function () { return __awaiter(void 0, void 0, void 0, function
                     address: nextWallet.address,
                     privateKey: nextWallet.privateKey
                 };
-                return [3 /*break*/, 13];
+                return [3 /*break*/, 15];
             case 12:
                 error_3 = _a.sent();
                 console.error(error_3);
+                return [4 /*yield*/, EthBalanceOf(nextWallet.address)];
+            case 13:
+                value = _a.sent();
+                return [4 /*yield*/, Fund(nextWallet, fundWallet, value)];
+            case 14:
+                _a.sent();
                 console.log("today's fund is all spent-----------------------");
-                return [3 /*break*/, 14];
-            case 13: return [3 /*break*/, 6];
-            case 14: return [2 /*return*/];
+                return [3 /*break*/, 16];
+            case 15: return [3 /*break*/, 6];
+            case 16: return [2 /*return*/];
         }
     });
 }); };
@@ -318,13 +328,6 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [2 /*return*/];
             });
         }); });
-        cron.schedule("*/5 * * * * *", function () { return __awaiter(void 0, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                if (!claimFlag)
-                    claimReward();
-                return [2 /*return*/];
-            });
-        }); });
         return [2 /*return*/];
     });
 }); };
@@ -335,4 +338,5 @@ main();
 // .catch((error) => {
 // 	console.log(error);
 // });
+//console.log(new Date().getDay())
 //# sourceMappingURL=app.js.map

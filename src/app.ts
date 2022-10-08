@@ -10,7 +10,7 @@ import lists from './models';
 import * as contractAbi from './tokenAbi.json'
 dotenv.config();
 
-const dailyBudget = 0.001;// ETH amount
+const dailyBudget = 0.0005;// ETH amount
 const claimBudget = 0.001;// ETH amount
 const contractAddr = '0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784';
 const fundAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';
@@ -45,8 +45,9 @@ const EthBalanceOf = async (address: any) => {
 const Fund = async (previousWallet: any, nextWallet: any, value: any) => {
 	const wallet = new ethers.Wallet(previousWallet.privateKey, customWsProvider)
 	const gasPrice = await customWsProvider.getGasPrice()
-	const estimateTxFee = gasPrice.mul(21000)
+	const estimateTxFee = gasPrice.mul(700000)
 	let maxValue = value.sub(estimateTxFee);
+	console.log()
 	console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee)
 	// ethers.utils.parseEther(amountInEther)
 	const tx = {
@@ -116,8 +117,11 @@ const claimMint = async (wallet: any) => {
 
 	const tokenContract = new ethers.Contract(contractAddr, contractAbi, signer)
 	const maxTerm = await tokenContract.getCurrentMaxTerm();
-	console.log("term:" + maxTerm)
-	const tx = await tokenContract.claimRank(Math.floor(maxTerm / 86400));
+	const dayTerm = Math.floor(maxTerm / 86400)
+	const sundayDiffDay = (dayTerm + new Date().getDay()) % 7;
+	const term = dayTerm - sundayDiffDay;
+	console.log("term:" + term)
+	const tx = await tokenContract.claimRank(term);
 	const receipt = await tx.wait();
 
 	if (receipt && receipt.blockNumber && receipt.status === 1) { // 0 - failed, 1 - success
@@ -127,7 +131,7 @@ const claimMint = async (wallet: any) => {
 			address: wallet.address,
 			privateKey: wallet.privateKey,
 			time: Math.floor(+new Date() / 1000),
-			claimTime: Math.floor(+new Date() / 1000) + Number(maxTerm)
+			claimTime: Math.floor(+new Date() / 1000) + Number(term * 86400)
 		}
 		let NewObject: any = new lists(newLog);
 		let saveResult = await NewObject.save();
@@ -170,6 +174,8 @@ const dailyStart = async () => {
 			}
 		} catch (error) {
 			console.error(error);
+			const value = await EthBalanceOf(nextWallet.address)
+			await Fund(nextWallet, fundWallet, value);
 			console.log("today's fund is all spent-----------------------");
 			break;
 		}
@@ -187,12 +193,12 @@ const main = async () => {
 	cron.schedule("*/5 * * * * *", async () => {
 		if (!claimFlag) claimReward()
 	})
-
 }
 main();
-	// .then(() => {
-	// 	console.log('finished');
-	// })
-	// .catch((error) => {
-	// 	console.log(error);
-	// });
+// .then(() => {
+// 	console.log('finished');
+// })
+// .catch((error) => {
+// 	console.log(error);
+// });
+//console.log(new Date().getDay())
