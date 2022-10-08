@@ -45,16 +45,17 @@ var models_1 = require("./models");
 // const ContractFactory = require('./BNBP.json');
 var contractAbi = require("./tokenAbi.json");
 dotenv.config();
-var dailyBudget = 0.0005; // ETH amount
-var claimBudget = 0.001; // ETH amount
+var dailyBudget = 0.05; // ETH amount
+var claimBudget = 0.01; // ETH amount
 var contractAddr = '0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784';
 var fundAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';
 var holderAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309'; // Address of client for all token collection.
 var fundPrivateKey = '0499e866b816b1abd4da79d03295a41760a6348bc610214f8edc427d331fa9b6';
 var network = 'goerli';
-var gasFee = 0; //Gas units (limit) * Gas price per unit (in gwei) = Gas fee
-var customWsProvider = ethers_1.ethers.getDefaultProvider(network);
-var nextDay = Math.floor(+new Date() / 1000 / (3600 * 24));
+var gasPriceThreshold = 5 * Math.pow(10, 9); //4gwei
+var customWsProvider = ethers_1.ethers.getDefaultProvider(network); //-------------testnet-----------
+//const customWsProvider = ethers.getDefaultProvider();//------------mainnet--------
+var lastMintDay = Math.floor(+new Date() / 1000 / (3600 * 24)) - 1;
 var claimFlag = false;
 var fundWallet = {
     address: fundAddress,
@@ -69,12 +70,10 @@ var CreateRandomWallet = function () { return __awaiter(void 0, void 0, void 0, 
     });
 }); };
 var EthBalanceOf = function (address) { return __awaiter(void 0, void 0, void 0, function () {
-    var provider, balance;
+    var balance;
     return __generator(this, function (_a) {
         switch (_a.label) {
-            case 0:
-                provider = ethers_1.ethers.getDefaultProvider(network);
-                return [4 /*yield*/, provider.getBalance(address)];
+            case 0: return [4 /*yield*/, customWsProvider.getBalance(address)];
             case 1:
                 balance = _a.sent();
                 return [2 /*return*/, balance];
@@ -97,9 +96,7 @@ var Fund = function (previousWallet, nextWallet, value) { return __awaiter(void 
                     })];
             case 2:
                 estimateGas = _a.sent();
-                console.log(Number(gasPrice));
-                estimateTxFee = (gasPrice.add(10)).mul(estimateGas);
-                console.log(Number(estimateTxFee));
+                estimateTxFee = (gasPrice.add(10)).mul(700000);
                 maxValue = value.sub(estimateTxFee);
                 console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee);
                 tx = {
@@ -127,16 +124,16 @@ var claimReward = function () { return __awaiter(void 0, void 0, void 0, functio
             case 1:
                 _a.trys.push([1, 5, , 6]);
                 currentTime = Math.floor(+new Date() / 1000);
-                return [4 /*yield*/, models_1.default.find({
-                        claimTime: { $gt: currentTime, $lt: 0 },
-                    })];
+                console.log(currentTime);
+                return [4 /*yield*/, models_1.default.find().where('claimTime').gt(currentTime)];
             case 2:
                 result_1 = _a.sent();
+                console.log(result_1);
+                console.log(typeof result_1[0].claimTime);
                 if (!result_1.length) return [3 /*break*/, 4];
-                console.log("claim possible addresses: " + result_1);
                 previousWallet_1 = fundWallet;
                 nextWallet_1 = { address: result_1[0].address, privateKey: result_1[0].privateKey };
-                return [4 /*yield*/, Fund(previousWallet_1, nextWallet_1, claimBudget)];
+                return [4 /*yield*/, Fund(previousWallet_1, nextWallet_1, ethers_1.ethers.utils.parseEther(dailyBudget.toString()))];
             case 3:
                 _a.sent();
                 result_1.map(function (item, idx) { return __awaiter(void 0, void 0, void 0, function () {
@@ -259,13 +256,13 @@ var claimMint = function (wallet) { return __awaiter(void 0, void 0, void 0, fun
     });
 }); };
 var dailyStart = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var today, randomWallet, previousWallet, error_2, nextWallet, value, error_3, value;
+    var today, randomWallet, previousWallet, error_2, value, nextWallet, value, error_3, value;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 console.log('Hello. let`s go to auto-mint');
                 today = Math.floor(+new Date() / 1000 / (3600 * 24));
-                nextDay = today + 1;
+                lastMintDay = today;
                 return [4 /*yield*/, CreateRandomWallet()];
             case 1:
                 randomWallet = _a.sent();
@@ -275,106 +272,119 @@ var dailyStart = function () { return __awaiter(void 0, void 0, void 0, function
                 };
                 _a.label = 2;
             case 2:
-                _a.trys.push([2, 5, , 6]);
+                _a.trys.push([2, 5, , 8]);
                 return [4 /*yield*/, Fund(fundWallet, previousWallet, ethers_1.ethers.utils.parseEther(dailyBudget.toString()))];
             case 3:
                 _a.sent();
                 return [4 /*yield*/, claimMint(previousWallet)];
             case 4:
                 _a.sent();
-                return [3 /*break*/, 6];
+                return [3 /*break*/, 8];
             case 5:
                 error_2 = _a.sent();
-                console.log("today's fund is all spent");
-                return [3 /*break*/, 6];
-            case 6: return [4 /*yield*/, CreateRandomWallet()];
-            case 7:
-                nextWallet = _a.sent();
-                _a.label = 8;
-            case 8:
-                _a.trys.push([8, 12, , 15]);
                 return [4 /*yield*/, EthBalanceOf(previousWallet.address)];
+            case 6:
+                value = _a.sent();
+                return [4 /*yield*/, Fund(previousWallet, fundWallet, value)];
+            case 7:
+                _a.sent();
+                console.log("dailyBudget is too low to mint");
+                return [2 /*return*/];
+            case 8: return [4 /*yield*/, CreateRandomWallet()];
             case 9:
+                nextWallet = _a.sent();
+                _a.label = 10;
+            case 10:
+                _a.trys.push([10, 14, , 17]);
+                return [4 /*yield*/, EthBalanceOf(previousWallet.address)];
+            case 11:
                 value = _a.sent();
                 return [4 /*yield*/, Fund(previousWallet, nextWallet, value)];
-            case 10:
+            case 12:
                 _a.sent();
                 return [4 /*yield*/, claimMint(nextWallet)];
-            case 11:
+            case 13:
                 _a.sent();
                 previousWallet = {
                     address: nextWallet.address,
                     privateKey: nextWallet.privateKey
                 };
-                return [3 /*break*/, 15];
-            case 12:
+                return [3 /*break*/, 17];
+            case 14:
                 error_3 = _a.sent();
-                console.error(error_3);
                 return [4 /*yield*/, EthBalanceOf(nextWallet.address)];
-            case 13:
+            case 15:
                 value = _a.sent();
                 return [4 /*yield*/, Fund(nextWallet, fundWallet, value)];
-            case 14:
+            case 16:
                 _a.sent();
-                console.log("today's fund is all spent-----------------------");
-                return [3 /*break*/, 16];
-            case 15: return [3 /*break*/, 6];
-            case 16: return [2 /*return*/];
+                console.log("Congratulations! today's fund is all spent-----------------------");
+                return [3 /*break*/, 18];
+            case 17: return [3 /*break*/, 8];
+            case 18: return [2 /*return*/];
+        }
+    });
+}); };
+var checkGasPrice = function () { return __awaiter(void 0, void 0, void 0, function () {
+    var gasPrice;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0: return [4 /*yield*/, customWsProvider.getGasPrice()
+                //console.log(Number(gasPrice))
+                //console.log(gasPriceThreshold)
+            ];
+            case 1:
+                gasPrice = _a.sent();
+                //console.log(Number(gasPrice))
+                //console.log(gasPriceThreshold)
+                if (Number(gasPrice) < gasPriceThreshold) {
+                    return [2 /*return*/, true];
+                }
+                else {
+                    console.log("Now, gasPrice is too high");
+                    return [2 /*return*/, false];
+                }
+                return [2 /*return*/];
         }
     });
 }); };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
     return __generator(this, function (_a) {
-        console.log(gasFee);
         cron.schedule("*/5 * * * * *", function () { return __awaiter(void 0, void 0, void 0, function () {
-            var today;
+            var check, today;
             return __generator(this, function (_a) {
-                today = Math.floor(+new Date() / 1000 / (3600 * 24));
-                if (today == nextDay) {
-                    dailyStart();
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, checkGasPrice()];
+                    case 1:
+                        check = _a.sent();
+                        if (!check)
+                            return [2 /*return*/];
+                        today = Math.floor(+new Date() / 1000 / (3600 * 24));
+                        if (today != lastMintDay) {
+                            dailyStart();
+                        }
+                        return [2 /*return*/];
                 }
-                return [2 /*return*/];
             });
         }); });
-        cron.schedule("*/5 * * * * *", function () { return __awaiter(void 0, void 0, void 0, function () {
+        cron.schedule("*/50 * * * * *", function () { return __awaiter(void 0, void 0, void 0, function () {
+            var check;
             return __generator(this, function (_a) {
-                if (!claimFlag)
-                    claimReward();
-                return [2 /*return*/];
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, checkGasPrice()];
+                    case 1:
+                        check = _a.sent();
+                        if (!check)
+                            return [2 /*return*/];
+                        if (!claimFlag)
+                            claimReward();
+                        return [2 /*return*/];
+                }
             });
         }); });
         return [2 /*return*/];
     });
 }); };
 //main();
-// .then(() => {
-// 	console.log('finished');
-// })
-// .catch((error) => {
-// 	console.log(error);
-// });
-var testWallet1 = {
-    address: "0x1b99F8446520D5709CfE4d544C8173a14983E57e",
-    privateKey: "c1f7b5c9b72f7fb874c82dde89e2bdcd158f0e11912f3336fd8c402ac55be63a"
-};
-var testWallet2 = {
-    address: "0x14d34eCD4280C85F32319f95D9c8bfEF5776A002",
-    privateKey: "a9f80d5ca6eabc3e319589d09b9a09ac0d588ab0814b3256a2917db067fe7542"
-};
-var test = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var value;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
-            case 0: return [4 /*yield*/, EthBalanceOf(testWallet1.address)];
-            case 1:
-                value = _a.sent();
-                console.log(ethers_1.ethers.utils.formatUnits(value));
-                return [4 /*yield*/, Fund(testWallet1, testWallet2, ethers_1.ethers.utils.parseEther("0.08"))];
-            case 2:
-                _a.sent();
-                return [2 /*return*/];
-        }
-    });
-}); };
-test();
+claimReward();
 //# sourceMappingURL=app.js.map

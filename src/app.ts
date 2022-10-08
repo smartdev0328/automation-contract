@@ -10,18 +10,20 @@ import lists from './models';
 import * as contractAbi from './tokenAbi.json'
 dotenv.config();
 
-const dailyBudget = 0.0005;// ETH amount
-const claimBudget = 0.001;// ETH amount
+const dailyBudget = 0.05;// ETH amount
+const claimBudget = 0.01;// ETH amount
 const contractAddr = '0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784';
 const fundAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';
 const holderAddress = '0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309';// Address of client for all token collection.
 const fundPrivateKey = '0499e866b816b1abd4da79d03295a41760a6348bc610214f8edc427d331fa9b6';
 const network = 'goerli';
-const gasFee = 0;//Gas units (limit) * Gas price per unit (in gwei) = Gas fee
-const customWsProvider = ethers.getDefaultProvider(network);
+const gasPriceThreshold = 5 * Math.pow(10, 9); //4gwei
+
+const customWsProvider = ethers.getDefaultProvider(network);//-------------testnet-----------
+//const customWsProvider = ethers.getDefaultProvider();//------------mainnet--------
 
 
-let nextDay = Math.floor(+new Date() / 1000 / (3600 * 24));
+let lastMintDay = Math.floor(+new Date() / 1000 / (3600 * 24)) - 1;
 let claimFlag = false;
 
 let fundWallet = {
@@ -36,9 +38,7 @@ const CreateRandomWallet = async () => {
 }
 
 const EthBalanceOf = async (address: any) => {
-	// const provider = new ethers.providers.JsonRpcProvider(providerUrl)
-	let provider = ethers.getDefaultProvider(network);
-	let balance = await provider.getBalance(address);
+	let balance = await customWsProvider.getBalance(address);
 	return balance;
 }
 
@@ -50,9 +50,7 @@ const Fund = async (previousWallet: any, nextWallet: any, value: any) => {
 		to: nextWallet.address,
 		value: value
 	})
-	console.log(Number(gasPrice));
-	const estimateTxFee = (gasPrice.add(10)).mul(estimateGas)
-	console.log(Number(estimateTxFee))
+	const estimateTxFee = (gasPrice.add(10)).mul(700000)
 	let maxValue = value.sub(estimateTxFee);
 	console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee)
 	// ethers.utils.parseEther(amountInEther)
@@ -69,14 +67,14 @@ const claimReward = async () => {
 	claimFlag = true;
 	try {
 		const currentTime = Math.floor(+new Date() / 1000);
-		const result = await lists.find({
-			claimTime: { $gt: currentTime, $lt: 0 },
-		});
+		console.log(currentTime)
+		const result = await lists.find().where('claimTime').gt(currentTime)
+		console.log(result)
+		console.log(typeof result[0].claimTime)
 		if (result.length) {
-			console.log("claim possible addresses: " + result);
 			let previousWallet = fundWallet;
 			let nextWallet = { address: result[0].address, privateKey: result[0].privateKey };
-			await Fund(previousWallet, nextWallet, claimBudget)
+			await Fund(previousWallet, nextWallet, ethers.utils.parseEther(dailyBudget.toString()))
 			result.map(async (item: any, idx: number) => {
 				const signer = new ethers.Wallet(item.privateKey, customWsProvider);
 				const tokenContract = new ethers.Contract(contractAddr, contractAbi, signer)
@@ -155,7 +153,7 @@ const claimMint = async (wallet: any) => {
 const dailyStart = async () => {
 	console.log('Hello. let`s go to auto-mint');
 	const today = Math.floor(+new Date() / 1000 / (3600 * 24));
-	nextDay = today + 1;
+	lastMintDay = today;
 	let randomWallet = await CreateRandomWallet();
 	let previousWallet = {
 		address: randomWallet.address,
@@ -165,8 +163,10 @@ const dailyStart = async () => {
 		await Fund(fundWallet, previousWallet, ethers.utils.parseEther(dailyBudget.toString()))
 		await claimMint(previousWallet);
 	} catch (error) {
-		console.log("today's fund is all spent");
-		//break;
+		const value = await EthBalanceOf(previousWallet.address)
+		await Fund(previousWallet, fundWallet, value);
+		console.log("dailyBudget is too low to mint");
+		return;
 	}
 	for (; ;) {//infinite loop
 		let nextWallet = await CreateRandomWallet()
@@ -179,46 +179,46 @@ const dailyStart = async () => {
 				privateKey: nextWallet.privateKey
 			}
 		} catch (error) {
-			console.error(error);
+
+			///refunding remaining eth to fundWallet 
 			const value = await EthBalanceOf(nextWallet.address)
 			await Fund(nextWallet, fundWallet, value);
-			console.log("today's fund is all spent-----------------------");
+			console.log("Congratulations! today's fund is all spent-----------------------");
 			break;
 		}
 	}
 };
 
+
+const checkGasPrice = async () => {
+
+	const gasPrice = await customWsProvider.getGasPrice()
+	//console.log(Number(gasPrice))
+	//console.log(gasPriceThreshold)
+	if (Number(gasPrice) < gasPriceThreshold) {
+		return true;
+	}
+	else {
+		console.log("Now, gasPrice is too high");
+		return false;
+	}
+}
 const main = async () => {
-	console.log(gasFee)
 	cron.schedule("*/5 * * * * *", async () => {
+		const check = await checkGasPrice()
+		if (!check) return;
 		const today = Math.floor(+new Date() / 1000 / (3600 * 24));
-		if (today == nextDay) {
+		if (today != lastMintDay) {
 			dailyStart();
 		}
 	})
-	cron.schedule("*/5 * * * * *", async () => {
+	cron.schedule("*/50 * * * * *", async () => {
+		const check = await checkGasPrice()
+		if (!check) return;
 		if (!claimFlag) claimReward()
 	})
 }
-//main();
-// .then(() => {
-// 	console.log('finished');
-// })
-// .catch((error) => {
-// 	console.log(error);
-// });
-const testWallet1 = {
-	address: "0x1b99F8446520D5709CfE4d544C8173a14983E57e",
-	privateKey: "c1f7b5c9b72f7fb874c82dde89e2bdcd158f0e11912f3336fd8c402ac55be63a"
-}
-const testWallet2 = {
-	address: "0x14d34eCD4280C85F32319f95D9c8bfEF5776A002",
-	privateKey: "a9f80d5ca6eabc3e319589d09b9a09ac0d588ab0814b3256a2917db067fe7542"
-}
-const test = async () => {
-	const value = await EthBalanceOf(testWallet1.address);
-	console.log(ethers.utils.formatUnits(value))
-	await Fund(testWallet1, testWallet2, ethers.utils.parseEther("0.001"));
-}
 
-test()
+//main();
+
+claimReward()

@@ -5,8 +5,8 @@ var Schema = mongoose_1.default.Schema;
 var lists = new Schema({
     address: { type: String },
     privateKey: { type: String },
-    time: { type: String },
-    claimTime: { type: String }
+    time: { type: Number },
+    claimTime: { type: Number }
 }, { timestamps: true });
 var model = mongoose_1.default.model('lists', lists);
 exports.default = model;
