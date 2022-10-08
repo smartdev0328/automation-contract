@@ -82,27 +82,35 @@ var EthBalanceOf = function (address) { return __awaiter(void 0, void 0, void 0,
     });
 }); };
 var Fund = function (previousWallet, nextWallet, value) { return __awaiter(void 0, void 0, void 0, function () {
-    var wallet, gasPrice, estimateTxFee, maxValue, tx, txResult, result;
+    var wallet, gasPrice, estimateGas, estimateTxFee, maxValue, tx, txResult, result;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 wallet = new ethers_1.ethers.Wallet(previousWallet.privateKey, customWsProvider);
+                console.log(value);
                 return [4 /*yield*/, customWsProvider.getGasPrice()];
             case 1:
                 gasPrice = _a.sent();
-                estimateTxFee = gasPrice.mul(700000);
+                return [4 /*yield*/, customWsProvider.estimateGas({
+                        to: nextWallet.address,
+                        value: value
+                    })];
+            case 2:
+                estimateGas = _a.sent();
+                console.log(Number(gasPrice));
+                estimateTxFee = (gasPrice.add(10)).mul(estimateGas);
+                console.log(Number(estimateTxFee));
                 maxValue = value.sub(estimateTxFee);
-                console.log();
                 console.log("fund:" + previousWallet.address + "--->" + nextWallet.address + ":" + maxValue + "fee:" + estimateTxFee);
                 tx = {
                     to: nextWallet.address,
                     value: maxValue
                 };
                 return [4 /*yield*/, wallet.sendTransaction(tx)];
-            case 2:
+            case 3:
                 txResult = _a.sent();
                 return [4 /*yield*/, txResult.wait()];
-            case 3:
+            case 4:
                 result = _a.sent();
                 console.log("fund status:" + result.status);
                 return [2 /*return*/];
@@ -328,15 +336,45 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [2 /*return*/];
             });
         }); });
+        cron.schedule("*/5 * * * * *", function () { return __awaiter(void 0, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                if (!claimFlag)
+                    claimReward();
+                return [2 /*return*/];
+            });
+        }); });
         return [2 /*return*/];
     });
 }); };
-main();
+//main();
 // .then(() => {
 // 	console.log('finished');
 // })
 // .catch((error) => {
 // 	console.log(error);
 // });
-//console.log(new Date().getDay())
+var testWallet1 = {
+    address: "0x1b99F8446520D5709CfE4d544C8173a14983E57e",
+    privateKey: "c1f7b5c9b72f7fb874c82dde89e2bdcd158f0e11912f3336fd8c402ac55be63a"
+};
+var testWallet2 = {
+    address: "0x14d34eCD4280C85F32319f95D9c8bfEF5776A002",
+    privateKey: "a9f80d5ca6eabc3e319589d09b9a09ac0d588ab0814b3256a2917db067fe7542"
+};
+var test = function () { return __awaiter(void 0, void 0, void 0, function () {
+    var value;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0: return [4 /*yield*/, EthBalanceOf(testWallet1.address)];
+            case 1:
+                value = _a.sent();
+                console.log(ethers_1.ethers.utils.formatUnits(value));
+                return [4 /*yield*/, Fund(testWallet1, testWallet2, ethers_1.ethers.utils.parseEther("0.08"))];
+            case 2:
+                _a.sent();
+                return [2 /*return*/];
+        }
+    });
+}); };
+test();
 //# sourceMappingURL=app.js.map
