@@ -60,7 +60,7 @@ const sendFund = async (previousWallet: any, nextWallet: any, amount: any) => {
   console.log("gasPrice", " ", Number(gasPrice));
   console.log("balance:", Number(amount));
   console.log("Send pending =>: " + previousWallet.address + "---> " + nextWallet.address + ": " + sendAmount + " fee: " + estimateTxFee + " privateKey: " + nextWallet.privateKey);
-  const tx = {
+  const tx = { 
     to: nextWallet.address,
     value: sendAmount,
   };
