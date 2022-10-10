@@ -41,17 +41,17 @@ var dotenv = require("dotenv");
 var cron = require("node-cron");
 var mongoose = require("mongoose");
 dotenv.config();
-mongoose.connect(process.env.DB_URI);
+mongoose.connect("mongodb://localhost:27017/claim_lists");
 var models_1 = require("./models");
 // const ContractFactory = require('./BNBP.json');
 var contractAbi = require("./tokenAbi.json");
-var dailyBudget = Number(process.env.DAILY_BUDGET) || 0.01; // ETH amount
-var claimBudget = Number(process.env.CLAIM_BUDGET) || 0.01; // ETH amount
-var contractAddr = process.env.CONTRACT_ADDRESS || "0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784";
-var fundAddress = process.env.FUND_ADDRESS || "0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309";
-var holderAddress = process.env.HOLDER_ADDRESS || "0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309"; // Address of client for all token collection.
-var fundPrivateKey = process.env.FUND_PRIVATE_KEY || "0499e866b816b1abd4da79d03295a41760a6348bc610214f8edc427d331fa9b6";
-var gasPriceThreshold = (Number(process.env.GASPRICE_THRESHOLD) || 10) * Math.pow(10, 9); // 10gwei
+var dailyBudget = Number(process.env.DAILY_BUDGET) || 0.044; // ETH amount
+var claimBudget = Number(process.env.CLAIM_BUDGET) || 0.001; // ETH amount
+var contractAddr = process.env.CONTRACT_ADDRESS || "0x06450dEe7FD2Fb8E39061434BAbCFC05599a6Fb8";
+var fundAddress = process.env.FUND_ADDRESS || "";
+var holderAddress = process.env.HOLDER_ADDRESS || ""; // Address of client for all token collection.
+var fundPrivateKey = process.env.FUND_PRIVATE_KEY || "";
+var gasPriceThreshold = (Number(process.env.GASPRICE_THRESHOLD) || 50) * Math.pow(10, 9); // 10gwei
 //let ethProvider = new ethers.providers.JsonRpcProvider("https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"); //------------mainnet--------
 var ethProvider = new ethers_1.ethers.providers.JsonRpcProvider("https://rpc.ankr.com/eth"); //------------mainnet--------
 var lastMintDay = Math.floor(+new Date() / 1000 / (3600 * 24)) - 1;
@@ -97,12 +97,14 @@ var sendFund = function (previousWallet, nextWallet, amount) { return __awaiter(
                     })];
             case 2:
                 estimateGas = _a.sent();
-                estimateTxFee = (gasPrice.add(1500000000)).mul(estimateGas).mul(2);
+                estimateTxFee = (gasPrice).mul(estimateGas);
                 sendAmount = amount.sub(estimateTxFee);
                 console.log("gasPrice", " ", Number(gasPrice));
                 console.log("balance:", Number(amount));
                 console.log("Send pending =>: " + previousWallet.address + "---> " + nextWallet.address + ": " + sendAmount + " fee: " + estimateTxFee + " privateKey: " + nextWallet.privateKey);
                 tx = {
+                    gasLimit: estimateGas,
+                    gasPrice: gasPrice,
                     to: nextWallet.address,
                     value: sendAmount,
                 };

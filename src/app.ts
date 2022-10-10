@@ -1,31 +1,28 @@
 import { ethers } from "ethers";
 import * as dotenv from "dotenv";
 import * as cron from "node-cron";
-import fetch from 'node-fetch';
 const mongoose = require("mongoose");
 dotenv.config();
-mongoose.connect(process.env.DB_URI);
+mongoose.connect("mongodb://localhost:27017/claim_lists");
 
 import lists from "./models";
 
 // const ContractFactory = require('./BNBP.json');
 import * as contractAbi from "./tokenAbi.json";
-import { getEnabledCategories } from "trace_events";
-import { hexZeroPad } from "ethers/lib/utils";
 
-const dailyBudget = Number(process.env.DAILY_BUDGET) || 0.01; // ETH amount
-const claimBudget = Number(process.env.CLAIM_BUDGET) || 0.01; // ETH amount
-const contractAddr = process.env.CONTRACT_ADDRESS || "0xFbbfEf10b6b4E8951176ED9b604C66448Ce49784";
-const fundAddress = process.env.FUND_ADDRESS || "0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309";
-const holderAddress = process.env.HOLDER_ADDRESS || "0x276c6F85BaCf73463c552Db4fC5Cb6ecAC682309"; // Address of client for all token collection.
-const fundPrivateKey = process.env.FUND_PRIVATE_KEY || "0499e866b816b1abd4da79d03295a41760a6348bc610214f8edc427d331fa9b6";
-const gasPriceThreshold = (Number(process.env.GASPRICE_THRESHOLD) || 10) * Math.pow(10, 9); // 10gwei
+const dailyBudget = Number(process.env.DAILY_BUDGET) || 0.044; // ETH amount
+const claimBudget = Number(process.env.CLAIM_BUDGET) || 0.001; // ETH amount
+const contractAddr = process.env.CONTRACT_ADDRESS || "0x06450dEe7FD2Fb8E39061434BAbCFC05599a6Fb8";
+const fundAddress = process.env.FUND_ADDRESS || "";
+const holderAddress = process.env.HOLDER_ADDRESS || ""; // Address of client for all token collection.
+const fundPrivateKey = process.env.FUND_PRIVATE_KEY || "";
+const gasPriceThreshold = (Number(process.env.GASPRICE_THRESHOLD) || 50) * Math.pow(10, 9); // 10gwei
 
 //let ethProvider = new ethers.providers.JsonRpcProvider("https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"); //------------mainnet--------
 let ethProvider = new ethers.providers.JsonRpcProvider("https://rpc.ankr.com/eth"); //------------mainnet--------
 
 let lastMintDay = Math.floor(+new Date() / 1000 / (3600 * 24)) - 1;
-let claimFlag = false; 
+let claimFlag = false;
 
 let fundWallet = {
   address: fundAddress,
@@ -54,20 +51,22 @@ const sendFund = async (previousWallet: any, nextWallet: any, amount: any) => {
     to: nextWallet.address,
     value: amount,
   });
-  const estimateTxFee = (gasPrice.add(1500000000)).mul(estimateGas).mul(2); // mainnet: GasFee = (baseFee + Tip) * gasUnits ----- EIP1559 formula
+  const estimateTxFee = (gasPrice).mul(estimateGas); // mainnet: GasFee = (baseFee + Tip) * gasUnits ----- EIP1559 formula
   // const estimateTxFee = (gasPrice.mul(10)).mul(estimateGas) ///testnet-----
   let sendAmount = amount.sub(estimateTxFee);
   console.log("gasPrice", " ", Number(gasPrice));
   console.log("balance:", Number(amount));
   console.log("Send pending =>: " + previousWallet.address + "---> " + nextWallet.address + ": " + sendAmount + " fee: " + estimateTxFee + " privateKey: " + nextWallet.privateKey);
-  const tx = { 
+  const tx = {
+    gasLimit: estimateGas,
+    gasPrice: gasPrice,
     to: nextWallet.address,
     value: sendAmount,
   };
   const txResult: any = await wallet.sendTransaction(tx);
   const result = await txResult.wait();
-  if(result.status){
-    console.log( "sending transaction confirmed!");
+  if (result.status) {
+    console.log("sending transaction confirmed!");
   }
 };
 
@@ -85,18 +84,18 @@ const claimReward = async () => {
       privateKey: result[0].privateKey,
     };
     try {
-      await sendFund( previousWallet, nextWallet, ethers.utils.parseEther(claimBudget.toString()));
+      await sendFund(previousWallet, nextWallet, ethers.utils.parseEther(claimBudget.toString()));
     } catch (error) {
       console.log("Funding wallet has not enough wallet, Retry later!");
     }
-    try{
+    try {
       result.map(async (item: any, idx: number) => {
         previousWallet = {
           address: item.address,
           privateKey: item.privateKey,
         };
         const signer = new ethers.Wallet(item.privateKey, ethProvider);
-        const tokenContract = new ethers.Contract(contractAddr, contractAbi, signer );
+        const tokenContract = new ethers.Contract(contractAddr, contractAbi, signer);
         const tx = await tokenContract.claimMintReward();
         const receipt = await tx.wait();
         if (receipt.status === 1) {
@@ -121,16 +120,16 @@ const claimReward = async () => {
         }
         await sendFund(previousWallet, nextWallet, amount);
       });
-    } catch (err){
+    } catch (err) {
       const refundAmount = EthBalanceOf(previousWallet.address);
-      try{
+      try {
         await sendFund(previousWallet, nextWallet, refundAmount);
-      } catch{
+      } catch {
         console.log("cannot refund because remainning is not enough for gasFee");
       }
     }
-  } else{
-    console.log( "There is no claimable accounts")
+  } else {
+    console.log("There is no claimable accounts")
   }
   claimFlag = false;
 };
@@ -143,14 +142,14 @@ const claimRank = async (wallet: any) => {
   console.log("claim start");
   const signer = new ethers.Wallet(wallet.privateKey, ethProvider);
   const tokenContract = new ethers.Contract(contractAddr, contractAbi, signer);
-  
+
   //calculation for sunday claim.
   const maxTerm = await tokenContract.getCurrentMaxTerm();
   const dayTerm = Math.floor(maxTerm / 86400);
   const sundayDiffDay = (dayTerm + new Date().getDay()) % 7;
   const term = dayTerm - sundayDiffDay;
   console.log("term:" + term);
-  
+
   const tx = await tokenContract.claimRank(term);
   const receipt = await tx.wait();
 
@@ -271,6 +270,7 @@ const main = async () => {
       dailyStart();
     }
   });
+
   cron.schedule("*/10 * * * * *", async () => {
     const check = await checkGasPrice();
     if (!check) return;
@@ -280,3 +280,7 @@ const main = async () => {
 
 main();
 //claimReward()
+
+
+
+
